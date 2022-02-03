@@ -51,6 +51,10 @@ public final class SocketServer {
             server.availableSocketClients.put(socket.getRemoteSocketAddress(), socket);
         }
 
+        public Socket getSocket() {
+            return socket;
+        }
+
         public void run() {
             try {
                 // 读取客户端数据
