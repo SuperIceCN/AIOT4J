@@ -63,6 +63,23 @@ public final class SocketServer {
         }
     }
 
+    public void close() {
+        availableSocketClients.values().forEach(aiotClient -> {
+            if (aiotClient.dataOutputStream == null) {
+                try {
+                    aiotClient.dataOutputStream = new DataOutputStream(aiotClient.socket.getOutputStream());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            try {
+                aiotClient.dataOutputStream.writeBytes("closeClient\n");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
     public static class AIOTClient implements Runnable {
         private final SocketServer server;
         private Socket socket;
@@ -94,14 +111,14 @@ public final class SocketServer {
         }
 
         public Promise<String> send(String str) {
-            if(dataOutputStream == null) {
+            if (dataOutputStream == null) {
                 try {
                     dataOutputStream = new DataOutputStream(socket.getOutputStream());
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
-            if(dataOutputStream != null) {
+            if (dataOutputStream != null) {
                 try {
                     System.err.println(str + "\n");
                     dataOutputStream.writeBytes(str + "\n");
@@ -124,7 +141,7 @@ public final class SocketServer {
                     if (clientInputStr != null) {
                         // 处理客户端数据
                         this.handler.handle(this.socket, clientInputStr);
-                        if(promise != null) {
+                        if (promise != null) {
                             promise.resolve(clientInputStr);
                             promise = null;
                         }

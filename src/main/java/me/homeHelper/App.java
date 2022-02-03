@@ -55,6 +55,7 @@ public final class App {
         mainFrame.addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
+                socketServer.close();
                 socketServer.setRunning(false);
                 socketThread.interrupt();
                 super.windowClosing(e);
