@@ -20,7 +20,7 @@ public final class Main {
             }else {
                 socketServer.availableSocketClients.values().forEach(socket -> {
                     try {
-                        new DataOutputStream(socket.getOutputStream()).writeBytes(cmd + "\n");
+                        new DataOutputStream(socket.getSocket().getOutputStream()).writeBytes(cmd + "\n");
                     } catch (IOException e) {
                         e.printStackTrace();
                     }

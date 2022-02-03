@@ -3,6 +3,9 @@
 
   "welcome_title": "欢迎使用居家帮手",
   "author_title": "by 刘浩宇",
+  "connect_success": "已连接到终端 %1 - MicroPython",
+  "connect_failed": "尚未连接终端",
 
-  "welcome_tab": "欢迎页面"
+  "welcome_tab": "欢迎页面",
+  "debug_tab": "调试终端"
 }

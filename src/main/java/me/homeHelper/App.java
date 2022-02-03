@@ -1,11 +1,18 @@
 package me.homeHelper;
 
 import com.formdev.flatlaf.FlatLightLaf;
+import me.aiot.SizeOnlyComponentListener;
 import me.aiot.SocketServer;
 
 import javax.swing.*;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 
 import java.awt.*;
+import java.awt.event.*;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static me.homeHelper.assets.TextAssets.TEXTS;
 
@@ -29,17 +36,35 @@ public final class App {
         mainFrame.setVisible(true);
         mainFrame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 
+        // 创建AIOT4J服务器
+        socketServer = new SocketServer();
+
         tabPane = new JTabbedPane(JTabbedPane.BOTTOM, JTabbedPane.SCROLL_TAB_LAYOUT);
         mainFrame.setContentPane(tabPane);
         initTabs();
+
         // 启动AIOT4J服务器
-        socketServer = new SocketServer();
-        final var socketThread = new Thread(socketServer::init);
-        //socketThread.start();
+        final var socketThread = new Thread(() -> socketServer.init((socket) -> {
+            // 刷新调试终端页面
+            tabPane.removeTabAt(tabPane.indexOfTab(TEXTS.get("debug_tab")));
+            tabPane.addTab(TEXTS.get("debug_tab"), createDebugTab());
+        }, (socket, message) -> {
+            System.err.println(message);
+        }));
+        socketThread.start();
+        mainFrame.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                socketServer.setRunning(false);
+                socketThread.interrupt();
+                super.windowClosing(e);
+            }
+        });
     }
 
     private void initTabs() {
         tabPane.addTab(TEXTS.get("welcome_tab"), createWelcomeTab());
+        tabPane.addTab(TEXTS.get("debug_tab"), createDebugTab());
     }
 
     private Component createWelcomeTab() {
@@ -63,5 +88,74 @@ public final class App {
         outBox.add(box2);
         outBox.add(Box.createVerticalGlue());
         return outBox;
+    }
+
+    static final Map<Integer, String> wordMap = new LinkedHashMap<>();
+
+    static {
+        wordMap.put(0, "垃圾回收");
+        wordMap.put(1, "获取数字输入值");
+        wordMap.put(2, "设置数字输入值");
+        wordMap.put(3, "模拟输出");
+        wordMap.put(4, "模拟输入");
+        wordMap.put(5, "设置蜂鸣器状态");
+        wordMap.put(6, "获取温湿度");
+        wordMap.put(7, "自定义命令");
+    }
+
+    private Component createDebugTab() {
+        var panel = new JPanel(new BorderLayout(8, 8));
+        var connectLabel = new JLabel();
+        var box = Box.createVerticalBox();
+        var list = new JList<>(wordMap.values().toArray(new String[0]));
+        var innerBox = Box.createHorizontalBox();
+        var textField = new JTextField();
+        var button = new JButton("↗");
+        var textArea = new JTextArea();
+
+        final var client = this.socketServer.getClient();
+        if (client != null) {
+            connectLabel.setText(TEXTS.get("connect_success", client.getSocket().getRemoteSocketAddress().toString()));
+            connectLabel.setForeground(new Color(80, 152, 60));
+        } else {
+            connectLabel.setText(TEXTS.get("connect_failed"));
+            connectLabel.setForeground(new Color(168, 93, 72));
+        }
+        connectLabel.setBorder(BorderFactory.createEmptyBorder(2, 8, 0, 0));
+        panel.add(connectLabel, BorderLayout.NORTH);
+
+        textField.setToolTipText("输入命令参数");
+        button.setToolTipText("发送");
+        innerBox.add(textField);
+        innerBox.add(button);
+
+        list.setBorder(BorderFactory.createEmptyBorder(0, 0, panel.getHeight() - 208, 0));
+        panel.addComponentListener((SizeOnlyComponentListener) e ->
+                list.setBorder(BorderFactory.createEmptyBorder(0, 0, panel.getHeight() - 208, 0)));
+
+        button.addActionListener(e -> {
+            if (list.getSelectedIndex() != -1) {
+                final var index = list.getSelectedIndex();
+                if (client != null) {
+                    if (index == 7) {
+                        client.send(textField.getText())
+                                .then(message -> textArea.append(message + "\n"));
+                    } else {
+                        client.send("$" + index + textField.getText().replace(" ", ""))
+                                .then(message -> textArea.append(message + "\n"));
+                    }
+                }
+                System.out.println("$" + index + textField.getText().replace(" ", ""));
+            }
+        });
+
+        box.add(list);
+        box.add(Box.createVerticalStrut(4));
+        box.add(innerBox);
+        box.add(Box.createVerticalStrut(4));
+        panel.add(box, BorderLayout.WEST);
+
+        panel.add(textArea, BorderLayout.CENTER);
+        return panel;
     }
 }

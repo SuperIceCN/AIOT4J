@@ -13,11 +13,19 @@ public final class TextAssets {
 
     TextAssets() {
         jsonObject = JsonParser.parseReader(new InputStreamReader(
-                Objects.requireNonNull(TextAssets.class.getResourceAsStream("/texts.json"))))
+                        Objects.requireNonNull(TextAssets.class.getResourceAsStream("/texts.json"))))
                 .getAsJsonObject();
     }
 
     public String get(String key) {
         return jsonObject.get(key).getAsString();
+    }
+
+    public String get(String key, String... args) {
+        var str = get(key);
+        for (var i = 0; i < args.length; i++) {
+            str = str.replaceFirst("%" + (i + 1), args[i]);
+        }
+        return str;
     }
 }
