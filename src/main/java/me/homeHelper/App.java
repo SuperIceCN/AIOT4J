@@ -11,6 +11,8 @@ import javax.swing.text.BadLocationException;
 import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.File;
+import java.net.MalformedURLException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -24,6 +26,7 @@ public final class App {
     public final JFrame mainFrame;
     public final JTabbedPane tabPane;
     public final JMenuBar menuBar;
+    public final TrayIcon trayIcon;
 
     public JList<String> moduleList;
 
@@ -35,6 +38,7 @@ public final class App {
     }
 
     App() {
+        TrayIcon trayIcon1;
         mainFrame = new JFrame(TEXTS.get("title"));
         mainFrame.setSize(1080, 720);
         mainFrame.setLocationRelativeTo(null);
@@ -45,7 +49,18 @@ public final class App {
         mainFrame.setJMenuBar(menuBar);
         initMenuBar();
 
+        // 创建托盘图标
+        var tray = SystemTray.getSystemTray();
+        try {
+            trayIcon1 = new TrayIcon(Toolkit.getDefaultToolkit().createImage(new File("./src/main/resources/icon.png").toURI().toURL()), TEXTS.get("title"));
+            tray.add(trayIcon1);
+        } catch (AWTException | MalformedURLException e) {
+            trayIcon1 = null;
+            e.printStackTrace();
+        }
+
         // 创建AIOT4J服务器
+        trayIcon = trayIcon1;
         socketServer = new SocketServer();
 
         tabPane = new JTabbedPane(JTabbedPane.BOTTOM, JTabbedPane.SCROLL_TAB_LAYOUT);

@@ -6,7 +6,9 @@ import com.caoccao.javet.interop.NodeRuntime;
 import com.caoccao.javet.values.reference.V8ValueFunction;
 import com.caoccao.javet.values.reference.V8ValuePromise;
 import me.aiot.SocketServer;
+import me.homeHelper.App;
 
+import java.awt.*;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicIntegerArray;
@@ -59,5 +61,10 @@ public final class API {
     @V8Function
     public void print(String str) {
         System.out.println(str);
+    }
+
+    @V8Function
+    public void info(String title, String message) {
+        App.APP.trayIcon.displayMessage(title, message, TrayIcon.MessageType.INFO);
     }
 }
