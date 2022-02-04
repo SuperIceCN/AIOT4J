@@ -5,6 +5,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.util.HashMap;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
 
 public final class SocketServer {
@@ -87,6 +89,9 @@ public final class SocketServer {
         private DataOutputStream dataOutputStream = null;
         private Promise<String> promise;
 
+        public final Data data = new Data();
+        public Timer timer = new Timer();
+
         public AIOTClient(SocketServer server, Socket socket, ClientHandler clientHandler) {
             this.server = server;
             this.socket = socket;
@@ -120,7 +125,6 @@ public final class SocketServer {
             }
             if (dataOutputStream != null) {
                 try {
-                    System.err.println(str + "\n");
                     dataOutputStream.writeBytes(str + "\n");
                     this.promise = new Promise<>();
                 } catch (IOException e) {
@@ -169,6 +173,27 @@ public final class SocketServer {
                 }
             }
         }
+
+        public void startCollect() {
+            timer.cancel();
+            timer = new Timer();
+            timer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    try {
+                        send("$$").then(e -> {
+                            final var arr = e.split(";");
+                            System.out.println(e);
+                            data.light = Integer.parseInt(arr[0]);
+                            data.temperature = Integer.parseInt(arr[1]);
+                            data.humidity = Integer.parseInt(arr[2]);
+                        });
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }, 0, 1500);
+        }
     }
 
     public interface ServerHandler {
@@ -177,5 +202,11 @@ public final class SocketServer {
 
     public interface ClientHandler {
         void handle(Socket socket, String message);
+    }
+
+    public static final class Data {
+        public int temperature;
+        public int humidity;
+        public int light;
     }
 }

@@ -7,5 +7,10 @@
   "connect_failed": "尚未连接终端",
 
   "welcome_tab": "欢迎页面",
-  "debug_tab": "调试终端"
+  "debug_tab": "调试终端",
+  "module_tab": "模块管理",
+
+  "module_menu": "模块功能",
+  "add_module": "添加新模块",
+  "run_module": "运行选中的模块"
 }

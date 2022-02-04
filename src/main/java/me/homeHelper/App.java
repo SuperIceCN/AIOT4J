@@ -5,22 +5,27 @@ import me.aiot.SizeOnlyComponentListener;
 import me.aiot.SocketServer;
 
 import javax.swing.*;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.ListSelectionListener;
-
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.text.BadLocationException;
 import java.awt.*;
-import java.awt.event.*;
-import java.util.HashMap;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static me.aiot.js.JSPool.POOL;
 import static me.homeHelper.assets.TextAssets.TEXTS;
 
 public final class App {
+    public static int connectTimes = 0;
     public static App APP;
 
     public final JFrame mainFrame;
     public final JTabbedPane tabPane;
+    public final JMenuBar menuBar;
+
+    public JList<String> moduleList;
 
     public final SocketServer socketServer;
 
@@ -36,6 +41,10 @@ public final class App {
         mainFrame.setVisible(true);
         mainFrame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 
+        menuBar = new JMenuBar();
+        mainFrame.setJMenuBar(menuBar);
+        initMenuBar();
+
         // 创建AIOT4J服务器
         socketServer = new SocketServer();
 
@@ -48,9 +57,7 @@ public final class App {
             // 刷新调试终端页面
             tabPane.removeTabAt(tabPane.indexOfTab(TEXTS.get("debug_tab")));
             tabPane.addTab(TEXTS.get("debug_tab"), createDebugTab());
-        }, (socket, message) -> {
-            System.err.println(message);
-        }));
+        }, (socket, message) -> connectTimes++));
         socketThread.start();
         mainFrame.addWindowListener(new WindowAdapter() {
             @Override
@@ -66,6 +73,27 @@ public final class App {
     private void initTabs() {
         tabPane.addTab(TEXTS.get("welcome_tab"), createWelcomeTab());
         tabPane.addTab(TEXTS.get("debug_tab"), createDebugTab());
+        tabPane.addTab(TEXTS.get("module_tab"), createModuleTab());
+    }
+
+    private void initMenuBar() {
+        final var moduleMenu = new JMenu(TEXTS.get("module_menu"));
+        final var addModuleItem = new JMenuItem(TEXTS.get("add_module"));
+        addModuleItem.addActionListener(e -> {
+            final var name = JOptionPane.showInputDialog(mainFrame, "新模块名称");
+            POOL.addJSModule(socketServer, name, "// 在此输入您的居家帮手模块代码\n");
+            refreshModuleList();
+        });
+        moduleMenu.add(addModuleItem);
+        final var runModuleItem = new JMenuItem(TEXTS.get("run_module"));
+        runModuleItem.addActionListener(e -> {
+            final var name = moduleList.getSelectedValue();
+            if (POOL.codeMap.containsKey(name)) {
+                POOL.runJSModule(name);
+            }
+        });
+        moduleMenu.add(runModuleItem);
+        menuBar.add(moduleMenu);
     }
 
     private Component createWelcomeTab() {
@@ -158,5 +186,59 @@ public final class App {
 
         panel.add(textArea, BorderLayout.CENTER);
         return panel;
+    }
+
+    public Component createModuleTab() {
+        var splitPanel = new JSplitPane();
+        moduleList = new JList<>();
+        var textarea = new JTextArea();
+
+        splitPanel.setLeftComponent(moduleList);
+        splitPanel.setRightComponent(textarea);
+        splitPanel.setDividerLocation(160);
+
+        refreshModuleList();
+        moduleList.addListSelectionListener(e -> {
+            final var name = moduleList.getModel().getElementAt(e.getFirstIndex());
+            textarea.setText(POOL.codeMap.get(name));
+        });
+
+        textarea.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                try {
+                    POOL.saveJSModule(moduleList.getSelectedValue(), e.getDocument().getText(0, e.getDocument().getLength()));
+                } catch (BadLocationException ex) {
+                    ex.printStackTrace();
+                }
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                try {
+                    POOL.saveJSModule(moduleList.getSelectedValue(), e.getDocument().getText(0, e.getDocument().getLength()));
+                } catch (BadLocationException ex) {
+                    ex.printStackTrace();
+                }
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                try {
+                    POOL.saveJSModule(moduleList.getSelectedValue(), e.getDocument().getText(0, e.getDocument().getLength()));
+                } catch (BadLocationException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        });
+
+        return splitPanel;
+    }
+
+    private void refreshModuleList() {
+        if (moduleList == null) {
+            return;
+        }
+        moduleList.setListData(POOL.runtimeMap.keySet().toArray(new String[0]));
     }
 }
