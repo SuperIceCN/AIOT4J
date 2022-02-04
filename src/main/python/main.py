@@ -2,6 +2,8 @@ import time
 import usocket
 import ssd1306
 import machine
+import gc
+import dhtx
 
 # 延迟间隔
 DELAY_TIME = 100
@@ -13,6 +15,7 @@ AIOT4J_PORT = 14213
 global sock # type: socket
 global screen # type: Screen
 global rocker  # type: Rocker
+global beeper # type: Beeper
 
 class Screen:
     def __init__(self, scl=16, sda=17) -> None:
@@ -96,12 +99,20 @@ class Screen:
         self.oled.show()
         return self.KEY[index]
 
+class Beeper:
+    def __init__(self, pin=12) -> None:
+        self.beep_pin = machine.Pin(pin, machine.Pin.OUT)
+
+    def open(self):
+        self.beep_pin.value(0)
+
+    def close(self):
+        self.beep_pin.value(1)
+
 def main():
     print("Running")
-    # 初始化操作杆
-    init_rocker()
-    # 初始化显示屏
-    init_oled()
+    # 初始化硬件对象
+    init_hardware()
     # 连接到wifi
     connect_wifi()
     # 连接到AIOT4J
@@ -109,14 +120,13 @@ def main():
     # 启动AIOT4J事件循环
     aiot4j_eventloop()
 
-def init_oled():
-    global screen
-    screen = Screen()
-
-
-def init_rocker():
+def init_hardware():
     global rocker
+    global screen
+    global beeper
     rocker = Rocker(35, 36, 39)
+    screen = Screen()
+    beeper = Beeper()
 
 
 def connect_wifi():
@@ -191,21 +201,62 @@ def aiot4j_connect():
 
 def aiot4j_eventloop():
     global sock
-    sock.send(b"connecting\n")
+    global beeper
+    sock.send("aiot\n")
     while True:
         buffer = sock.readline()
         if len(buffer) != 0:
             buffer = buffer.decode()
-            buffer = buffer[0:len(buffer)-1]
-            if buffer == "closeClient":
-                sock.send("closeServer\n")
-                sock.close()
-                break
-            else:
-                try:
+            buffer = buffer[0:len(buffer)-1] # type: str
+            try:
+                if buffer == "closeClient":
+                    sock.send("closeServer\n")
+                    sock.close()
+                    break
+                elif buffer.startswith("$0"): #垃圾回收
+                    gc.collect()
+                    sock.send("\n")
+                elif buffer.startswith("$1"): #获取Pin的值
+                    pin = machine.Pin(int(buffer[2:4]), machine.Pin.IN)
+                    sock.send(str(pin.value()) + "\n")
+                elif buffer.startswith("$2"): #设置Pin的值
+                    pin = machine.Pin(int(buffer[2:4]), machine.Pin.OUT)
+                    pin.value(int(buffer[4:5]))
+                    sock.send("\n")
+                elif buffer.startswith("$3"): #模拟输出
+                    pwm = machine.PWM(machine.Pin(int(buffer[2:4])))  # type: machine.PWM
+                    pwm.freq(2000)
+                    pwm.duty(int(buffer[4:]))
+                    sock.send("\n")
+                elif buffer.startswith("$4"): #模拟输入
+                    adc = machine.ADC(machine.Pin(int(buffer[2:4])))
+                    adc.atten(machine.ADC.ATTN_11DB)
+                    sock.send(str(adc.read()) + "\n")
+                elif buffer.startswith("$5"): #蜂鸣器
+                    flag = buffer[2:3]
+                    if flag == "T":
+                        beeper.open()
+                    elif flag == "F":
+                        beeper.close()
+                    sock.send("\n")
+                elif buffer.startswith("$6"): #温湿度传感器
+                    result = dhtx.get_dht_tempandhum('dht11', 13)
+                    temperature = result[0]
+                    humidity = result[1]
+                    sock.send(str(temperature) + ";" + str(humidity) + "\n")
+                elif buffer.startswith("$$"): #所有数据
+                    result = dhtx.get_dht_tempandhum('dht11', 13)
+                    temperature = result[0]
+                    humidity = result[1]
+                    adc = machine.ADC(machine.Pin(int(34)))
+                    adc.atten(machine.ADC.ATTN_11DB)
+                    sock.send(str(adc.read()) + ";" + str(temperature) + ";" + str(humidity) + "\n")
+                else:
                     sock.send(str(eval(buffer)) + "\n")
-                except:
-                    sock.send("Error encountered!\n")
+            except ValueError as e:
+                sock.send("Error:" + str(e) + "\n")
+            except:
+                sock.send("Error encountered!\n")
 
 if __name__ == '__main__':
     main()
